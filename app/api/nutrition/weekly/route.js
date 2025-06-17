@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth';
 import User from '@/models/User';
 import Meal from '@/models/Meal';
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);

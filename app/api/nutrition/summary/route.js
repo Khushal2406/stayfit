@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth';
 import Meal from '@/models/Meal';
 import User from '@/models/User';
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
@@ -12,10 +15,14 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await connectDB();
+    const db = await connectDB();
+    if (!db) {
+      console.error('Failed to connect to database');
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
+    }
     
     // Get user's details for calculations
-    const user = await User.findById(session.user.id);
+    const user = await User.findById(session.user.id).exec();
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

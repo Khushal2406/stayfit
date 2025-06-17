@@ -9,6 +9,9 @@ const extractNumber = (str) => {
   return match ? parseFloat(match[0]) : 0;
 };
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
