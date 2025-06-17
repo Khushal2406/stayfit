@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import Meal from '@/models/Meal';
 
 export async function GET(request) {
