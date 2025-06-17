@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 export const config = {
-  matcher: ['/profile/:path*', '/account/:path*', '/details/:path*']
+  matcher: [
+    '/profile/:path*', 
+    '/account/:path*', 
+    '/details/:path*',
+    '/api/nutrition/:path*',
+    '/api/user/:path*'
+  ]
 };
 
 export async function middleware(request) {
