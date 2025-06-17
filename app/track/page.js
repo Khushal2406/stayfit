@@ -1,10 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import { AiFillFire } from 'react-icons/ai';
+import { GiMeat, GiWheat, GiAvocado } from 'react-icons/gi';
+import FoodSearch from '@/components/FoodSearch';
+
+const mealTypes = [
+  { id: 'breakfast', label: 'Breakfast', icon: '🌅' },
+  { id: 'lunch', label: 'Lunch', icon: '🌞' },
+  { id: 'snack', label: 'Snacks', icon: '🍎' },
+  { id: 'dinner', label: 'Dinner', icon: '🌙' },
+];
 
 export default function TrackPage() {
   const { data: session } = useSession();
@@ -12,201 +22,262 @@ export default function TrackPage() {
   const [meals, setMeals] = useState({
     breakfast: [],
     lunch: [],
-    evening_snacks: [],
-    dinner: []
-  });
-  const [selectedMeal, setSelectedMeal] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+    dinner: [],
+    snack: []
+  });  const [selectedMealType, setSelectedMealType] = useState('breakfast');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const searchRef = useRef(null);
 
   useEffect(() => {
-    if (session?.user) {
-      fetchMeals();
+    if (!session) {
+      router.push('/login');
+      return;
     }
-  }, [session]);
+    fetchMeals();
+  }, [session, router]);
 
   const fetchMeals = async () => {
     try {
+      console.log('Fetching meals...');
       const response = await fetch('/api/nutrition/meals');
-      if (response.ok) {
-        const data = await response.json();
-        setMeals(data);
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server error:', errorData);
+        throw new Error(errorData.error || 'Failed to fetch meals');
+      }
+      
+      const data = await response.json();
+      console.log('Received meals data:', data);
+      
+      if (data.success) {
+        setMeals(data.meals);
+      } else {
+        throw new Error(data.error || 'Failed to load meals');
       }
     } catch (error) {
       console.error('Error fetching meals:', error);
-      toast.error('Failed to load meals');
+      toast.error(error.message || 'Failed to load meals');
     }
   };
 
-  const handleSearch = async (query) => {
-    if (!query.trim()) return;
+  const handleFoodSelect = async (food) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/nutrition/search?query=${encodeURIComponent(query)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data);
+      // Format the food data
+      const foodData = {
+        mealType: selectedMealType,
+        food: {
+          id: food.id,
+          name: food.name,
+          servingSize: food.servingSize,
+          nutrition: {
+            calories: parseInt(food.calories) || 0,
+            protein: parseFloat(food.protein) || 0,
+            carbs: parseFloat(food.carbs) || 0,
+            fat: parseFloat(food.fat) || 0,
+            fiber: parseFloat(food.fiber) || 0,
+            sugars: parseFloat(food.sugars) || 0
+          }
+        }
+      };
+
+      const response = await fetch('/api/nutrition/meals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(foodData)
+      });
+
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to add food');
       }
+      
+      toast.success('Food added to your meal!');
+      await fetchMeals();
+      setShowSearch(false);
     } catch (error) {
-      console.error('Error searching foods:', error);
-      toast.error('Failed to search foods');
+      console.error('Error adding food:', error);
+      toast.error(error.message || 'Failed to add food');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAddFood = async (food) => {
-    if (!selectedMeal) {
-      toast.error('Please select a meal type');
-      return;
-    }
+  const calculateTotalNutrition = () => {
+    let totals = {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0
+    };
 
-    try {
-      const response = await fetch('/api/nutrition/meals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mealType: selectedMeal,
-          foodId: food.id
-        }),
+    Object.values(meals).forEach(mealFoods => {
+      mealFoods.forEach(food => {
+        totals.calories += food.nutrition.calories || 0;
+        totals.protein += food.nutrition.protein || 0;
+        totals.carbs += food.nutrition.carbs || 0;
+        totals.fat += food.nutrition.fat || 0;
       });
+    });
 
-      if (response.ok) {
-        toast.success('Food added successfully');
-        fetchMeals(); // Refresh meals
-        setSearchResults([]); // Clear search results
-        setSearchQuery(''); // Clear search query
-      }
-    } catch (error) {
-      console.error('Error adding food:', error);
-      toast.error('Failed to add food');
-    }
+    return totals;
   };
 
-  if (!session) {
-    router.push('/login');
-    return null;
-  }
+  const totals = calculateTotalNutrition();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-center mb-8">Track Your Meals</h1>
-        
-        {/* Search and Add Section */}
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-            <div className="flex gap-4 mb-4">
-              <select
-                value={selectedMeal || ''}
-                onChange={(e) => setSelectedMeal(e.target.value)}
-                className="block w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select Meal Type</option>
-                <option value="breakfast">Breakfast</option>
-                <option value="lunch">Lunch</option>
-                <option value="evening_snacks">Evening Snacks</option>
-                <option value="dinner">Dinner</option>
-              </select>
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    handleSearch(e.target.value);
-                  }}
-                  placeholder="Search foods..."
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-                {isLoading && (
-                  <div className="absolute right-3 top-2">
-                    {/* Add your loading spinner component here */}
-                  </div>
-                )}
-              </div>
-            </div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Track Your Meals</h1>
+          <p className="text-gray-600 mb-8">Select a meal type and add your foods to track your nutrition</p>
 
-            {/* Search Results */}
-            {searchResults.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {searchResults.map((food) => (
-                  <motion.div
-                    key={food.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      {food.image && (
-                        <img
-                          src={`https://spoonacular.com/cdn/ingredients_100x100/${food.image}`}
-                          alt={food.name}
-                          className="w-12 h-12 rounded-md object-cover"
-                        />
-                      )}
-                      <div>
-                        <h3 className="font-medium">{food.name}</h3>
-                        {food.nutrition && (
-                          <p className="text-sm text-gray-500">
-                            {food.nutrition.calories} cal | {food.nutrition.protein}g protein
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleAddFood(food)}
-                      className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Add
-                    </button>
-                  </motion.div>
-                ))}
+          {/* Daily Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-br from-orange-100 to-orange-50 p-4 rounded-lg"
+            >
+              <div className="flex items-center mb-2">
+                <AiFillFire className="text-orange-500 text-2xl mr-2" />
+                <h3 className="font-semibold text-gray-800">Calories</h3>
               </div>
-            )}
-          </div>
+              <p className="text-2xl font-bold text-orange-600">{Math.round(totals.calories)}</p>
+              <p className="text-sm text-gray-600">kcal total</p>
+            </motion.div>
 
-          {/* Meals Display */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Object.entries(meals).map(([mealType, foods]) => (
-              <motion.div
-                key={mealType}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-6 rounded-lg shadow-sm"
-              >
-                <h2 className="text-xl font-semibold mb-4 capitalize">
-                  {mealType.replace('_', ' ')}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-br from-red-100 to-red-50 p-4 rounded-lg"
+            >
+              <div className="flex items-center mb-2">
+                <GiMeat className="text-red-500 text-2xl mr-2" />
+                <h3 className="font-semibold text-gray-800">Protein</h3>
+              </div>
+              <p className="text-2xl font-bold text-red-600">{Math.round(totals.protein)}g</p>
+              <p className="text-sm text-gray-600">protein total</p>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-br from-yellow-100 to-yellow-50 p-4 rounded-lg"
+            >
+              <div className="flex items-center mb-2">
+                <GiWheat className="text-yellow-600 text-2xl mr-2" />
+                <h3 className="font-semibold text-gray-800">Carbs</h3>
+              </div>
+              <p className="text-2xl font-bold text-yellow-600">{Math.round(totals.carbs)}g</p>
+              <p className="text-sm text-gray-600">carbs total</p>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className="bg-gradient-to-br from-green-100 to-green-50 p-4 rounded-lg"
+            >
+              <div className="flex items-center mb-2">
+                <GiAvocado className="text-green-500 text-2xl mr-2" />
+                <h3 className="font-semibold text-gray-800">Fat</h3>
+              </div>
+              <p className="text-2xl font-bold text-green-600">{Math.round(totals.fat)}g</p>
+              <p className="text-sm text-gray-600">fat total</p>
+            </motion.div>
+          </div>        </div>
+
+        {/* Food Search */}
+        <AnimatePresence>
+          {showSearch && (
+            <motion.div              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="bg-white rounded-xl shadow-sm p-6 mb-8"
+              ref={searchRef}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Add Food to {mealTypes.find(m => m.id === selectedMealType)?.label}</h3>
+                <button
+                  onClick={() => setShowSearch(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              <FoodSearch onFoodSelect={handleFoodSelect} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Meals Display */}
+        <div className="space-y-8">
+          {mealTypes.map(({ id, label, icon }) => (
+            <motion.div
+              key={id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-xl shadow-sm overflow-hidden"
+            >              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <span className="mr-2">{icon}</span>
+                  {label}
                 </h2>
-                {foods.length === 0 ? (
-                  <p className="text-gray-500">No foods added yet</p>
-                ) : (
+              </div>
+              
+              <div className="p-6">
+                {meals[id]?.length > 0 ? (
                   <div className="space-y-3">
-                    {foods.map((food) => (
-                      <div
-                        key={food._id}
-                        className="flex items-center justify-between p-2 border-b"
+                    {meals[id].map((food, index) => (
+                      <motion.div
+                        key={`${food.id}-${index}`}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        className="flex justify-between items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                       >
                         <div>
-                          <p className="font-medium">{food.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {food.calories} cal | {food.servingSize} {food.servingUnit}
-                          </p>
+                          <div className="font-medium text-gray-900">{food.name}</div>
+                          <div className="text-sm text-gray-600">{food.servingSize}</div>
                         </div>
-                        <button
-                          onClick={() => handleRemoveFood(food._id, mealType)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          Remove
-                        </button>
-                      </div>
+                        <div className="text-right">
+                          <div className="font-medium text-gray-900">{food.nutrition.calories} cal</div>
+                          <div className="text-sm text-gray-600">
+                            P: {food.nutrition.protein}g • C: {food.nutrition.carbs}g • F: {food.nutrition.fat}g
+                          </div>
+                        </div>
+                      </motion.div>
                     ))}
+                  </div>                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-4xl mb-3">🍽️</div>
+                    <p className="text-gray-500 mb-2">No foods added to {label.toLowerCase()} yet</p>
                   </div>
                 )}
-              </motion.div>
-            ))}
-          </div>
+              </div>
+              
+              {/* Add Food Button */}
+              <div className="p-4 border-t border-gray-100">                <button
+                  onClick={() => {
+                    setSelectedMealType(id);
+                    setShowSearch(true);
+                    // Wait for search component to mount before scrolling
+                    setTimeout(() => {
+                      searchRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                  }}
+                  className="w-full py-2 px-4 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Food to {label}
+                </button>
+              </div>
+            </motion.div>
+          ))}
         </div>
       </div>
     </div>

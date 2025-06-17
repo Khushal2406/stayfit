@@ -8,6 +8,7 @@ const CircularProgress = ({ value, max, label, color }) => {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percentage / 100) * circumference;
+  const unit = label === "Calories" ? "kcal" : "g";
 
   return (
     <div className="flex flex-col items-center">
@@ -40,11 +41,12 @@ const CircularProgress = ({ value, max, label, color }) => {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold">{Math.round(percentage)}%</span>
+          <span className="text-2xl font-bold text-gray-900">{Math.round(percentage)}%</span>
           <span className="text-sm text-gray-500">{label}</span>
         </div>
       </div>
       <p className="mt-2 text-sm text-gray-600">{value} / {max}</p>
+      <p className="text-xs text-gray-400">{unit}</p>
     </div>
   );
 };
@@ -70,69 +72,44 @@ const LinearProgress = ({ value, max, label, color }) => {
   );
 };
 
-export default function NutritionMeters({ targetCalories }) {
-  const [nutritionData, setNutritionData] = useState({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0
-  });
+export default function NutritionMeters({ nutritionData }) {
+  if (!nutritionData) {
+    return <div>Loading nutrition data...</div>;
+  }
 
-  useEffect(() => {
-    const fetchNutritionData = async () => {
-      try {
-        const response = await fetch('/api/nutrition/summary');
-        if (response.ok) {
-          const data = await response.json();
-          setNutritionData(data);
-        }
-      } catch (error) {
-        console.error('Error fetching nutrition data:', error);
-      }
-    };
-
-    fetchNutritionData();
-    // Set up interval to refresh data every 5 minutes
-    const interval = setInterval(fetchNutritionData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Calculate macro targets based on target calories
-  const targets = {
-    protein: Math.round((targetCalories * 0.3) / 4), // 30% of calories from protein (4 cal/g)
-    carbs: Math.round((targetCalories * 0.45) / 4),  // 45% of calories from carbs (4 cal/g)
-    fat: Math.round((targetCalories * 0.25) / 9),    // 25% of calories from fat (9 cal/g)
-  };
+  const {
+    calories = { current: 0, target: 2000 },
+    protein = { current: 0, target: 150 },
+    carbs = { current: 0, target: 250 },
+    fats = { current: 0, target: 65 }
+  } = nutritionData;
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <CircularProgress
-        value={nutritionData.calories}
-        max={targetCalories}
+        value={calories.current || 0}
+        max={calories.target || 2000}
         label="Calories"
         color="text-blue-500"
       />
-      
-      <div className="space-y-4">
-        <LinearProgress
-          value={nutritionData.protein}
-          max={targets.protein}
-          label="Protein"
-          color="bg-red-500"
-        />
-        <LinearProgress
-          value={nutritionData.carbs}
-          max={targets.carbs}
-          label="Carbs"
-          color="bg-yellow-500"
-        />
-        <LinearProgress
-          value={nutritionData.fat}
-          max={targets.fat}
-          label="Fat"
-          color="bg-green-500"
-        />
-      </div>
+      <CircularProgress
+        value={protein.current || 0}
+        max={protein.target || 150}
+        label="Protein"
+        color="text-red-500"
+      />
+      <CircularProgress
+        value={carbs.current || 0}
+        max={carbs.target || 250}
+        label="Carbs"
+        color="text-green-500"
+      />
+      <CircularProgress
+        value={fats.current || 0}
+        max={fats.target || 65}
+        label="Fats"
+        color="text-yellow-500"
+      />
     </div>
   );
 }

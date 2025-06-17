@@ -1,11 +1,6 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
-let User;
-
-try {
-  User = mongoose.model('User');
-} catch {
-  const userSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true
@@ -38,6 +33,20 @@ try {
     min: 100,
     max: 250
   },
+  weightGoal: {
+    type: Number,
+    min: 20,
+    max: 300
+  },
+  weeklyRate: {
+    type: Number,
+    enum: [0.25, 0.5, 1],
+    default: 0.5
+  },
+  isGaining: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -67,10 +76,7 @@ try {
     fats: {
       type: Number,
       default: 0
-    }  }
+    }
+  }
 });
-
-  User = mongoose.model('User', userSchema);
-}
-
-module.exports = User;
+export default mongoose.models.User || mongoose.model('User', userSchema);

@@ -21,11 +21,25 @@ export default function SignUp() {
     email: '',
     password: '',
   });
+  const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const validateField = (name, value) => {
+    try {
+      const fieldSchema = signupSchema.shape[name];
+      fieldSchema.parse(value);
+      setErrors(prev => ({ ...prev, [name]: null }));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        setErrors(prev => ({ ...prev, [name]: error.errors[0].message }));
+      }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrors({});
 
     try {
       // Validate form data
@@ -62,8 +76,12 @@ export default function SignUp() {
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.errors.map(err => err.message);
-        toast.error(errors.join('. '));
+        const formErrors = {};
+        error.errors.forEach(err => {
+          formErrors[err.path[0]] = err.message;
+        });
+        setErrors(formErrors);
+        toast.error('Please check the form for errors');
       } else {
         toast.error(error.message || 'Something went wrong');
       }
@@ -78,6 +96,7 @@ export default function SignUp() {
       ...prev,
       [name]: value
     }));
+    validateField(name, value);
   };
 
   return (
@@ -122,7 +141,7 @@ export default function SignUp() {
                 onChange={handleChange}
               />
               {errors.name && (
-                <p className="mt-1 text-sm text-red-500">{errors.name[0]}</p>
+                <p className="mt-1 text-sm text-red-500">{errors.name}</p>
               )}
             </div>
 
@@ -142,7 +161,7 @@ export default function SignUp() {
                 onChange={handleChange}
               />
               {errors.email && (
-                <p className="mt-1 text-sm text-red-500">{errors.email[0]}</p>
+                <p className="mt-1 text-sm text-red-500">{errors.email}</p>
               )}
             </div>
 
@@ -162,7 +181,7 @@ export default function SignUp() {
                 onChange={handleChange}
               />
               {errors.password && (
-                <p className="mt-1 text-sm text-red-500">{errors.password[0]}</p>
+                <p className="mt-1 text-sm text-red-500">{errors.password}</p>
               )}
             </div>
           </div>
