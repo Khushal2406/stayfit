@@ -41,7 +41,13 @@ export async function GET(request) {
 
     for (const meal of meals) {
       if (groupedMeals[meal.mealType]) {
-        groupedMeals[meal.mealType].push(...meal.foods);
+        // Add meal ID to each food item for deletion capability
+        const foodsWithIds = meal.foods.map(food => ({
+          ...food.toObject(),
+          _id: food._id.toString(),
+          mealId: meal._id.toString()
+        }));
+        groupedMeals[meal.mealType].push(...foodsWithIds);
       }
     }
 
@@ -144,7 +150,7 @@ export async function DELETE(request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -152,7 +158,7 @@ export async function DELETE(request) {
     const foodId = searchParams.get('foodId');
 
     if (!mealId || !foodId) {
-      return Response.json(
+      return NextResponse.json(
         { success: false, error: 'Meal ID and food ID are required' },
         { status: 400 }
       );
@@ -166,7 +172,7 @@ export async function DELETE(request) {
     });
 
     if (!meal) {
-      return Response.json(
+      return NextResponse.json(
         { success: false, error: 'Meal not found' },
         { status: 404 }
       );
@@ -175,10 +181,10 @@ export async function DELETE(request) {
     meal.foods = meal.foods.filter(food => food._id.toString() !== foodId);
     await meal.save();
     
-    return Response.json({ success: true, meal });
+    return NextResponse.json({ success: true, meal });
   } catch (error) {
     console.error('Delete food error:', error);
-    return Response.json(
+    return NextResponse.json(
       { success: false, error: error.message || 'Failed to delete food' },
       { status: 500 }
     );

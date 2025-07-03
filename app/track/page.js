@@ -74,12 +74,12 @@ export default function TrackPage() {
           name: food.name,
           servingSize: food.servingSize,
           nutrition: {
-            calories: parseInt(food.calories) || 0,
-            protein: parseFloat(food.protein) || 0,
-            carbs: parseFloat(food.carbs) || 0,
-            fat: parseFloat(food.fat) || 0,
-            fiber: parseFloat(food.fiber) || 0,
-            sugars: parseFloat(food.sugars) || 0
+            calories: parseFloat(food.nutrition.calories) || 0,
+            protein: parseFloat(food.nutrition.protein) || 0,
+            carbs: parseFloat(food.nutrition.carbs) || 0,
+            fat: parseFloat(food.nutrition.fat) || 0,
+            fiber: parseFloat(food.nutrition.fiber) || 0,
+            sugars: parseFloat(food.nutrition.sugars) || 0
           }
         }
       };
@@ -106,6 +106,26 @@ export default function TrackPage() {
       toast.error(error.message || 'Failed to add food');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteFood = async (food) => {
+    try {
+      const response = await fetch(`/api/nutrition/meals?mealId=${food.mealId}&foodId=${food._id}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to delete food');
+      }
+      
+      toast.success('Food removed from your meal');
+      await fetchMeals();
+    } catch (error) {
+      console.error('Error deleting food:', error);
+      toast.error(error.message || 'Failed to delete food');
     }
   };
 
@@ -236,17 +256,28 @@ export default function TrackPage() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
-                        className="flex justify-between items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                        className="grid grid-cols-12 items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                       >
-                        <div>
+                        <div className="col-span-5">
                           <div className="font-medium text-gray-900">{food.name}</div>
                           <div className="text-sm text-gray-600">{food.servingSize}</div>
                         </div>
-                        <div className="text-right">
+                        <div className="col-span-6 text-right">
                           <div className="font-medium text-gray-900">{food.nutrition.calories} cal</div>
                           <div className="text-sm text-gray-600">
                             P: {food.nutrition.protein}g • C: {food.nutrition.carbs}g • F: {food.nutrition.fat}g
                           </div>
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          <button 
+                            onClick={() => handleDeleteFood(food)}
+                            className="text-red-500 p-1 hover:bg-red-50 rounded-full"
+                            title="Remove food"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                         </div>
                       </motion.div>
                     ))}
